@@ -1,6 +1,9 @@
+#!/usr/bin/env python3
+
+# Run this in its directory to generate test cases.
+
 import random
 import os
-
 
 def generate_cfile() -> str:
     c1 = []
