@@ -3,10 +3,8 @@ A bare-bones c library for manipulating integers of arbitrary size. My test fram
 
 ## Running Tests
 
-I'll add a makefile at some point to make this easier. For now, cd into a subdirectory of "test", run the test-generator python script,
+Run `make` to generate the testcases and compile the unit testing program. This will:
 
-```python3 gen_tests.py```
+1. Run the `test/<test-dir>/python3 gen_tests.py` script, which creates the files `cases.cpp` and `cases.h`. These contain three vectors of equal length, where entries of the same index are a triplet `(x, y, z)` satisfying some binary operation (e.g. `x` + `y` = `z`). These values are partially randomized and partially hand-selected to test edge cases.
 
-and compile everything with a c++ compiler:
-
-```g++ -std=c++11 main.c cases.cpp ../testutils.c ../../src/add_sub_mul.c```
+2. Creates a program `main` which tests the corresponding function in `src/<file-containing-the-function-being-tested>` against all cases, and reports the results.
