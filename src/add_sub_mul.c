@@ -17,8 +17,8 @@
  * be one or zero.
  * @param[in] i (size_t): offset from @p z.
  */
-static inline void add_block(uint8_t x, uint8_t y, uint8_t *z, uint8_t *carry,
-                             size_t i) {
+static void add_block(uint8_t x, uint8_t y, uint8_t *z, uint8_t *carry,
+                      size_t i) {
   // Case 1: x + y == 255 and carry == 1.
   if (y == 0xFF - x) {
     if (*carry) {
@@ -55,8 +55,8 @@ static inline void add_block(uint8_t x, uint8_t y, uint8_t *z, uint8_t *carry,
  * one or zero.
  * @param[in] i (size_t): offset from @p z.
  */
-static inline void sub_block(uint8_t x, uint8_t y, uint8_t *z, uint8_t *carry,
-                             size_t i) {
+static void sub_block(uint8_t x, uint8_t y, uint8_t *z, uint8_t *carry,
+                      size_t i) {
   // Case 1: x - y - carry == -1;
   if (x == y) {
     if (*carry == 1) {
@@ -77,36 +77,54 @@ static inline void sub_block(uint8_t x, uint8_t y, uint8_t *z, uint8_t *carry,
   *carry = 0;
 }
 
-inline uint8_t add_bstrings_nocheck(const uint8_t *x, const uint8_t *y,
-                                    uint8_t *z, size_t x_size, size_t y_size,
-                                    size_t z_size) {
+/**
+ * @brief Adds @p x and @p y and stores their sum in @p z without performing any
+ * error handling.
+ *
+ * Requires y_size <= x_size, and that x, y, and z are not null.
+ */
+uint8_t add_bstrings_nocheck(const uint8_t *x, const uint8_t *y, uint8_t *z,
+                             size_t x_size, size_t y_size, size_t z_size) {
   uint8_t carry = 0;
-  for (int i = 0; i < x_size; i++) {
+  for (int i = 0; i < y_size && i < z_size; i++) {
     add_block(x[i], y[i], z, &carry, i);
   }
 
-  for (int i = x_size; i < y_size; i++) {
-    add_block(0, y[i], z, &carry, i);
+  for (int i = y_size; i < x_size && i < z_size; i++) {
+    add_block(x[i], 0, z, &carry, i);
+  }
+
+  // If we have room for overflow.
+  if (x_size < z_size && carry != 0) {
+    z[x_size] = 1;
+    carry = 0;
+    // Set overflow bit.
+    carry |= 0x02;
   }
 
   return carry;
 }
 
 /**
- * @brief Subtracts @p y and @p x, stores the difference in @p z.
+ * @brief Subtracts @p y and @p x and stores the difference in @p z without
+ * performing any error handling. @p carry will be set to 1 if the result is
+ * negative or @p z_size doesn't fit the difference @p y - @- x.
+ *
+ * Requires @p y_size <= @p x_size, and that @p x, @p y, and @p z are not null.
  */
-static inline uint8_t sub_bstrings_nocheck(const uint8_t *x, const uint8_t *y,
-                                           uint8_t *z, size_t x_size,
-                                           size_t y_size, size_t z_size) {
-  // Subtract y from x.
+uint8_t sub_bstrings_nocheck(const uint8_t *x, const uint8_t *y, uint8_t *z,
+                             size_t x_size, size_t y_size, size_t z_size) {
   uint8_t carry = 0;
-
-  for (int i = 0; i < y_size; i++) {
+  for (int i = 0; i < y_size && i < z_size; i++) {
     sub_block(x[i], y[i], z, &carry, i);
   }
 
-  for (int i = y_size; i < x_size && carry != 0; i++) {
+  for (int i = y_size; i < x_size && i < z_size; i++) {
     sub_block(x[i], 0, z, &carry, i);
+  }
+
+  for (int i = x_size; i < z_size; i++) {
+    sub_block(0, 0, z, &carry, i);
   }
 
   return carry;
@@ -118,28 +136,35 @@ static inline uint8_t sub_bstrings_nocheck(const uint8_t *x, const uint8_t *y,
  * Error codes:
  *    (0) Success.
  *    (1) @p x, @p y, or @p z is NULL.
- *    (2) max(@p x_size, @p y_size) > @p z_size
  *
- * @param[in] x (uint8_t*): Address of least significant byte of @p x.
- * @param[in] y (uint8_t*): Address of least significant byte of @p y.
- * @param[out] z (uint8_t*): Address of least significant byte of @p z.
+ * Flags (bit index, significance increasing):
+ *    (0) Carry bit. Set if the last carried value is 1. Equivalent to: @p x +
+ *        @p y doesn't fit in @p z.
+ *    (1) Overflow bit. Set if @p x + @p y has a larger representation than
+ *        @p x or @p y. Meaningless if the 0-bit is set.
+ *
+ * @param[in] x (uint8_t*): Points to an array of bytes in little-endian order.
+ * @param[in] y (uint8_t*): Points to an array of bytes in little-endian order.
+ * @param[out] z (uint8_t*):  On return, @p z stores the sum @p x + @p y in
+ * little-endian order. If @p z is larger than the minimum memory required to
+ * store @p x + @p y, significant bits are assumed to be zero (not zeroed out).
+ * If @p z is smaller than the minimum memory required to store @p x + @p y, @p
+ * z stores the first @ z_size bytes of @p x + @p y ordered by increasing
+ * significance.
  * @param[out] carry (uint8_t*): 1 if @p x + @p y > 2^(max(@p x_size, @p
  * y_size)), 0 otherwise.
- * @param x_size[in] (size_t): Size of @p x.
- * @param y_size[in] (size_t): Size of @p y.
- * @param z_size[in] (size_t): Size of @p z.
+ * @param[in] x_size (size_t): Size of @p x.
+ * @param[in] y_size (size_t): Size of @p y.
+ * @param[in] z_size (size_t): Size of @p z.
  *
- * @return ret (uint8_t): An error code.
+ * @return ret (uint8_t): An error code. See description for details.
  */
 uint8_t add_bstrings(const uint8_t *x, const uint8_t *y, uint8_t *z,
-                     uint8_t *carry, size_t x_size, size_t y_size,
+                     uint8_t *flags, size_t x_size, size_t y_size,
                      size_t z_size) {
   // Error check 1.
   if (x == NULL | y == NULL | z == NULL)
     return 1;
-  // Error check 2.
-  if ((x_size > z_size) | (y_size > z_size))
-    return 2;
 
   // Require x be larger than y.
   if (x_size < y_size) {
@@ -157,8 +182,7 @@ uint8_t add_bstrings(const uint8_t *x, const uint8_t *y, uint8_t *z,
     }
   }
 
-  uint8_t carry_temp = add_bstrings_nocheck(x, y, z, x_size, y_size, z_size);
-  *carry = carry_temp;
+  *flags = add_bstrings_nocheck(x, y, z, x_size, y_size, z_size);
 
   return 0;
 }
@@ -172,11 +196,10 @@ uint8_t add_bstrings(const uint8_t *x, const uint8_t *y, uint8_t *z,
  * Error codes:
  *    (0) Success.
  *    (1) @p x, @p y, or @p z is NULL.
- *    (2) max(@p x_size, @p y_size) > @p z_size
- *    (3) @p x_size < @p y_size
+ *    (2) @p x_size < @p y_size
  *
- * @param[in] x (uint8_t*): Address of least significant byte of @p x.
- * @param[in] y (uint8_t*): Address of least significant byte of @p y.
+ * @param[in] x (uint8_t*): Points to an array of bytes in little-endian order.
+ * @param[in] y (uint8_t*): Points to an array of bytes in little-endian order.
  * @param[out] z (uint8_t*): Address of least significant byte of @p z.
  * @param[out] carry (uint8_t*): The difference (@p x - @p y) - @p z between the
  * number stored in @p z, and the (potentially negative) number @p x - @p y.
@@ -192,20 +215,17 @@ uint8_t add_bstrings(const uint8_t *x, const uint8_t *y, uint8_t *z,
  *  Assumes @p y_size larger than @p x_size.
  */
 uint8_t sub_bstrings(const uint8_t *x, const uint8_t *y, uint8_t *z,
-                     uint8_t *carry, size_t x_size, size_t y_size,
+                     uint8_t *flags, size_t x_size, size_t y_size,
                      size_t z_size) {
   // Error check 1.
   if (x == NULL | y == NULL | z == NULL)
     return 1;
   // Error check 2.
-  if (x_size > z_size | y_size > z_size)
+  if (x_size < y_size) {
     return 2;
-  // Error check 3.
-  if (x_size < y_size)
-    return 3;
+  }
 
-  uint8_t carry_temp = sub_bstrings_nocheck(x, y, z, x_size, y_size, z_size);
-  *carry = carry_temp;
+  *flags = sub_bstrings_nocheck(x, y, z, x_size, y_size, z_size);
 
   return 0;
 }
