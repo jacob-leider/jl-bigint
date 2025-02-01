@@ -5,27 +5,63 @@
 import random
 import os
 
+
+def case_str(r1: int, r2: int) -> tuple[str, str, str]:
+    r3 = r1 + r2
+    s1 = f"{r1:X}"
+    s2 = f"{r2:X}"
+    s3 = f"{r3:X}"
+
+    if len(s1) % 2 == 1:
+        s1 = '0' + s1
+    if len(s2) % 2 == 1:
+        s2 = '0' + s2
+    if len(s3) % 2 == 1:
+        s3 = '0' + s3
+
+    if (len(s3) < max(len(s2), len(s1))):
+        s3 = '00' + s3
+
+    l1 = [s1[i:i + 2] for i in range(0,len(s1),2)]
+    l2 = [s2[i:i + 2] for i in range(0,len(s2),2)]
+    l3 = [s3[i:i + 2] for i in range(0,len(s3),2)]
+
+    t1 = f"{'{'}0x{', 0x'.join(l1)}{'}'}"
+    t2 = f"{'{'}0x{', 0x'.join(l2)}{'}'}"
+    t3 = f"{'{'}0x{', 0x'.join(l3)}{'}'}"
+    return t1, t2, t3
+
+
 def generate_cfile() -> str:
     c1 = []
     c2 = []
     c3 = []
 
+    # Random cases.
     for i in range(10):
-      r1 = random.randint(2**100, 2**101)
-      r2 = random.randint(2**100, 2**101)
-      r3 = r1 + r2
+        r1 = random.randint(2**100, 2**101)
+        r2 = random.randint(2**100, 2**101)
+        
+        t1, t2, t3 = case_str(r1, r2)
 
-      s1 = f"{r1:X}"
-      s2 = f"{r2:X}"
-      s3 = f"{r3:X}"
+        c1.append(t1)
+        c2.append(t2)
+        c3.append(t3)
+    
+    # Edge cases.
+    for i in range(40,60):
+        t1, t2, t3 = case_str(2**i, 2**(i + 1))
 
-      l1 = [s1[i:i + 1] + s1[i + 1:i + 2] for i in range(0,len(s1),2)]
-      l2 = [s2[i:i + 1] + s2[i + 1:i + 2] for i in range(0,len(s2),2)]
-      l3 = [s3[i:i + 1] + s3[i + 1:i + 2] for i in range(0,len(s3),2)]
+        c1.append(t1)
+        c2.append(t2)
+        c3.append(t3)
 
-      c1.append(f"{'{'}0x{', 0x'.join(l1)}{'}'}")
-      c2.append(f"{'{'}0x{', 0x'.join(l2)}{'}'}")
-      c3.append(f"{'{'}0x{', 0x'.join(l3)}{'}'}")
+        t1, t2, t3 = case_str(2**i - 1, 2**(i + 1) - 1)
+
+        c1.append(t1)
+        c2.append(t2)
+        c3.append(t3)
+
 
     headers = ["vector"]
     local_headers = [h_file_name]
