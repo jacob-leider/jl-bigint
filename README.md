@@ -1,5 +1,5 @@
 # jl-bigint
-A bare-bones c library for manipulating integers of arbitrary size. My test framework uses c++ (and a bit of python scripting), but everything in "src" is pure c.
+A bare-bones c library for manipulating integers of arbitrary size. My test framework uses c++ (and a bit of python scripting), but everything in `src` is pure c.
 
 ## Running Tests
 
