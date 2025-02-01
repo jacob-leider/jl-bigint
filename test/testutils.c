@@ -4,21 +4,13 @@
 #include <stdint.h>
 #include <stdio.h>
 
-void report_endianness() {
-  int num = 1;
-  if (*((char *)&num) == 1) {
-    printf("Little Endian\n");
-  } else {
-    printf("Big Endian\n");
-  }
-}
-
+/**
+ * @return endianness: 0 for little endian, 1 for big endian.
+ */
 int check_endianness() {
   int num = 1;
   return *((char *)&num) == 0;
 }
-
-void swap_bytes(uint16_t *x) { *x = ((*x) >> 8) | ((*x) << 8); }
 
 void printhex_le(const uint8_t *x, int num_bits) {
   for (int j = num_bits / 8 - 1; j >= 0; j--) {
