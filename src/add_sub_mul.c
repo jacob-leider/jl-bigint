@@ -77,6 +77,79 @@ static void sub_block(uint8_t x, uint8_t y, uint8_t *z, uint8_t *carry,
   *carry = 0;
 }
 
+// x_size <= y_size <= z_size
+static uint8_t sub_bstrings_nocheck_xyz(const uint8_t *x, const uint8_t *y,
+                                        uint8_t *z, size_t x_size,
+                                        size_t y_size, size_t z_size) {
+  uint8_t carry = 0;
+  for (int i = 0; i < x_size; i++)
+    sub_block(x[i], y[i], z, &carry, i);
+  // x[i] is zero
+  for (int i = x_size; i < y_size; i++)
+    sub_block(0, y[i], z, &carry, i);
+  // x[i] and y[i] are zero
+  for (int i = y_size; i < z_size; i++)
+    sub_block(0, 0, z, &carry, i);
+
+  return carry;
+}
+
+// x_size <= z_size <= y_size
+static uint8_t sub_bstrings_nocheck_xzy(const uint8_t *x, const uint8_t *y,
+                                        uint8_t *z, size_t x_size,
+                                        size_t y_size, size_t z_size) {
+  uint8_t carry = 0;
+  for (int i = 0; i < x_size; i++)
+    sub_block(x[i], y[i], z, &carry, i);
+  // x[i] is zero
+  for (int i = x_size; i < z_size; i++)
+    sub_block(0, y[i], z, &carry, i);
+
+  return carry;
+}
+
+// y_size <= x_size <= z_size
+static uint8_t sub_bstrings_nocheck_yxz(const uint8_t *x, const uint8_t *y,
+                                        uint8_t *z, size_t x_size,
+                                        size_t y_size, size_t z_size) {
+  uint8_t carry = 0;
+  for (int i = 0; i < y_size; i++)
+    sub_block(x[i], y[i], z, &carry, i);
+  // y[i] is zero
+  for (int i = y_size; i < x_size; i++)
+    sub_block(x[i], 0, z, &carry, i);
+  // y[i] and x[i] are zero
+  for (int i = x_size; i < z_size; i++)
+    sub_block(0, 0, z, &carry, i);
+
+  return carry;
+}
+
+// y_size <= z_size <= x_size
+static uint8_t sub_bstrings_nocheck_yzx(const uint8_t *x, const uint8_t *y,
+                                        uint8_t *z, size_t x_size,
+                                        size_t y_size, size_t z_size) {
+  uint8_t carry = 0;
+  for (int i = 0; i < y_size; i++)
+    sub_block(x[i], y[i], z, &carry, i);
+  // y[i] is zero.
+  for (int i = y_size; i < z_size; i++)
+    sub_block(x[i], 0, z, &carry, i);
+
+  return carry;
+}
+
+// z_size <= x_size, y_size
+static uint8_t sub_bstrings_nocheck_zxy(const uint8_t *x, const uint8_t *y,
+                                        uint8_t *z, size_t x_size,
+                                        size_t y_size, size_t z_size) {
+  uint8_t carry = 0;
+  for (int i = 0; i < z_size; i++)
+    sub_block(x[i], y[i], z, &carry, i);
+
+  return carry;
+}
+
 /**
  * @brief Adds @p x and @p y and stores their sum in @p z without performing any
  * error handling.
@@ -86,13 +159,11 @@ static void sub_block(uint8_t x, uint8_t y, uint8_t *z, uint8_t *carry,
 uint8_t add_bstrings_nocheck(const uint8_t *x, const uint8_t *y, uint8_t *z,
                              size_t x_size, size_t y_size, size_t z_size) {
   uint8_t carry = 0;
-  for (int i = 0; i < y_size && i < z_size; i++) {
+  for (int i = 0; i < y_size && i < z_size; i++)
     add_block(x[i], y[i], z, &carry, i);
-  }
-
-  for (int i = y_size; i < x_size && i < z_size; i++) {
+  // y[i] is zero.
+  for (int i = y_size; i < x_size && i < z_size; i++)
     add_block(x[i], 0, z, &carry, i);
-  }
 
   // If we have room for overflow.
   if (x_size < z_size && carry != 0) {
@@ -110,21 +181,53 @@ uint8_t add_bstrings_nocheck(const uint8_t *x, const uint8_t *y, uint8_t *z,
  * performing any error handling. @p carry will be set to 1 if the result is
  * negative or @p z_size doesn't fit the difference @p y - @- x.
  *
- * Requires @p y_size <= @p x_size, and that @p x, @p y, and @p z are not null.
+ * Let dx and dy be the orders of the most significant bits of x, y. Let dz
+ * be z_size - 1.
+ *
+ *    e.g. 2^(dx - 1) < x <= 2^dx.
+ *
+ * (1) If y > x: sub(x, y, z) returns (y - x) mod 2^z_size.
+ *
+ *    Note: (y - x) mod 2^dz can now be obtained as
+ *          2^dz - sub(x, y, z).
+ *    Note: As integers, x - y can be obtained as sub(x, y, z) - 2^dz
+ *
+ * (2) If y < x: sub(x, y, z) = (x - y) mod 2^dz.
+ *
+ *    If dz >= dx - dy: sub(x, y, z) = x - y.
+ *
+ *    If dz < dx - dy: z will miss leading bits, and the carry flag will be
+ *                      set.
+ *
+ * (3) If y == x: sub(x, y, z) = 0, and always fits in z.
+ *
+ * Requires that @p x, @p y, and @p z are not null.
  */
 uint8_t sub_bstrings_nocheck(const uint8_t *x, const uint8_t *y, uint8_t *z,
                              size_t x_size, size_t y_size, size_t z_size) {
   uint8_t carry = 0;
-  for (int i = 0; i < y_size && i < z_size; i++) {
-    sub_block(x[i], y[i], z, &carry, i);
-  }
-
-  for (int i = y_size; i < x_size && i < z_size; i++) {
-    sub_block(x[i], 0, z, &carry, i);
-  }
-
-  for (int i = x_size; i < z_size; i++) {
-    sub_block(0, 0, z, &carry, i);
+  if (x_size <= y_size) {
+    if (z_size <= x_size) {
+      // z_size <= x_size <= y_size
+      return sub_bstrings_nocheck_zxy(x, y, z, x_size, y_size, z_size);
+    } else if (z_size <= y_size) {
+      // x_size < z_size <= y_size
+      return sub_bstrings_nocheck_xzy(x, y, z, x_size, y_size, z_size);
+    } else {
+      // x_size < y_size <= z_size
+      return sub_bstrings_nocheck_xyz(x, y, z, x_size, y_size, z_size);
+    }
+  } else {
+    if (z_size <= y_size) {
+      // z_size <= y_size < x_size
+      return sub_bstrings_nocheck_zxy(x, y, z, x_size, y_size, z_size);
+    } else if (z_size <= x_size) {
+      // y_size < z_size <= x_size
+      return sub_bstrings_nocheck_yzx(x, y, z, x_size, y_size, z_size);
+    } else {
+      // y_size < x_size < z_size
+      return sub_bstrings_nocheck_yxz(x, y, z, x_size, y_size, z_size);
+    }
   }
 
   return carry;
@@ -138,19 +241,20 @@ uint8_t sub_bstrings_nocheck(const uint8_t *x, const uint8_t *y, uint8_t *z,
  *    (1) @p x, @p y, or @p z is NULL.
  *
  * Flags (bit index, significance increasing):
- *    (0) Carry bit. Set if the last carried value is 1. Equivalent to: @p x +
- *        @p y doesn't fit in @p z.
- *    (1) Overflow bit. Set if @p x + @p y has a larger representation than
- *        @p x or @p y. Meaningless if the 0-bit is set.
+ *    (0) Carry bit. Set if the last carried value is 1. Implies @p x +
+ *        @p y doesn't fit in @p z, but the converse doesn't necessarily hold.
+ *    (1) Overflow bit. Set if @p x + @p y has a larger  binary representation
+ *        than @p x or @p y. Meaningless if the 0-bit is set.
  *
- * @param[in] x (uint8_t*): Points to an array of bytes in little-endian order.
- * @param[in] y (uint8_t*): Points to an array of bytes in little-endian order.
+ * @param[in] x (uint8_t*): Points to an array of bytes in little-endian
+ * order.
+ * @param[in] y (uint8_t*): Points to an array of bytes in little-endian
+ * order.
  * @param[out] z (uint8_t*):  On return, @p z stores the sum @p x + @p y in
  * little-endian order. If @p z is larger than the minimum memory required to
- * store @p x + @p y, significant bits are assumed to be zero (not zeroed out).
- * If @p z is smaller than the minimum memory required to store @p x + @p y, @p
- * z stores the first @ z_size bytes of @p x + @p y ordered by increasing
- * significance.
+ * store @p x + @p y, significant bits are assumed to be zero. If @p z is
+ * smaller than the minimum memory required to store @p x + @p y, @p z stores
+ * the first @ z_size bytes of @p x + @p y ordered by increasing significance.
  * @param[out] carry (uint8_t*): 1 if @p x + @p y > 2^(max(@p x_size, @p
  * y_size)), 0 otherwise.
  * @param[in] x_size (size_t): Size of @p x.
@@ -196,23 +300,23 @@ uint8_t add_bstrings(const uint8_t *x, const uint8_t *y, uint8_t *z,
  * Error codes:
  *    (0) Success.
  *    (1) @p x, @p y, or @p z is NULL.
- *    (2) @p x_size < @p y_size
  *
- * @param[in] x (uint8_t*): Points to an array of bytes in little-endian order.
- * @param[in] y (uint8_t*): Points to an array of bytes in little-endian order.
+ * Flags:
+ *    // TODO: Check for a negative value.
+ *
+ * @param[in] x (uint8_t*): Points to an array of bytes in little-endian
+ * order.
+ * @param[in] y (uint8_t*): Points to an array of bytes in little-endian
+ * order.
  * @param[out] z (uint8_t*): Address of least significant byte of @p z.
- * @param[out] carry (uint8_t*): The difference (@p x - @p y) - @p z between the
- * number stored in @p z, and the (potentially negative) number @p x - @p y.
+ * @param[out] carry (uint8_t*): The difference (@p x - @p y) - @p z between
+ * the number stored in @p z, and the (potentially negative) number @p x - @p
+ * y.
  * @param x_size[in] (size_t): Size of @p x.
  * @param y_size[in] (size_t): Size of @p y.
  * @param z_size[in] (size_t): Size of @p z.
  *
  * @return ret (uint8_t): An error code.
- */
-
-/**
- * @brief Adds @p x and @p y, stores the sum in @p z.
- *  Assumes @p y_size larger than @p x_size.
  */
 uint8_t sub_bstrings(const uint8_t *x, const uint8_t *y, uint8_t *z,
                      uint8_t *flags, size_t x_size, size_t y_size,
@@ -220,10 +324,6 @@ uint8_t sub_bstrings(const uint8_t *x, const uint8_t *y, uint8_t *z,
   // Error check 1.
   if (x == NULL | y == NULL | z == NULL)
     return 1;
-  // Error check 2.
-  if (x_size < y_size) {
-    return 2;
-  }
 
   *flags = sub_bstrings_nocheck(x, y, z, x_size, y_size, z_size);
 
