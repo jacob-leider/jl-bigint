@@ -13,7 +13,7 @@ extern "C" {
 
 // g++ -std=c++11 main.c ../testutils.c ../../src/add_sub_mul.c cases.cpp
 
-int run_testcase_add(size_t case_id) {
+int run_testcase_add(size_t case_id, size_t *duration) {
   // Cases data.
   uint8_t *x = cases_x[case_id].data();
   uint8_t *y = cases_y[case_id].data();
@@ -33,8 +33,18 @@ int run_testcase_add(size_t case_id) {
   // x, y in LE.
   // z in BE.
 
+  // Start stopclock.
+  auto t1 = std::chrono::high_resolution_clock::now();
+
   uint8_t carry = 0;
   int rc = add_bstrings(x, y, z_test, &carry, x_size, y_size, z_test_size);
+
+  // End stopclock and get duration.
+  auto t2 = std::chrono::high_resolution_clock::now();
+  *duration =
+      std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count();
+  // Normalize (ns per byte processed).
+  *duration = *duration / z_size;
 
   std::reverse(cases_x[case_id].begin(), cases_x[case_id].end());
   std::reverse(cases_y[case_id].begin(), cases_y[case_id].end());
@@ -80,87 +90,6 @@ int run_testcase_add(size_t case_id) {
   return success;
 }
 
-/**
- * Return codes:
- *    0: Success
- *    1: Failure
- *    2: Indeterminate
- */
-int run_testcase_sub(size_t case_id) {
-  // x + y = z => x = z - y
-  // Cases data.
-  uint8_t *x = cases_x[case_id].data();
-  uint8_t *y = cases_y[case_id].data();
-  uint8_t *z = cases_z[case_id].data();
-  // Sizes.
-  size_t x_size = cases_x[case_id].size();
-  size_t y_size = cases_y[case_id].size();
-  size_t z_size = cases_z[case_id].size();
-
-  // Experimental.
-  size_t y_test_size = y_size;
-  std::vector<uint8_t> y_test_vec(y_test_size, 0);
-  uint8_t *y_test = y_test_vec.data();
-
-  std::reverse(cases_x[case_id].begin(), cases_x[case_id].end());
-  std::reverse(cases_z[case_id].begin(), cases_z[case_id].end());
-  // x, z in LE
-  // y in BE
-
-  uint8_t carry = 0;
-  int rc = sub_bstrings(z, x, y_test, &carry, z_size, x_size, y_test_size);
-
-  std::reverse(cases_x[case_id].begin(), cases_x[case_id].end());
-  std::reverse(cases_z[case_id].begin(), cases_z[case_id].end());
-  // x, z, y in BE
-  // y_test in LE
-
-  std::reverse(y_test, y_test + y_size);
-  // x, z, y, y_test in BE
-
-  if (rc) {
-    for (int i = 0; i < 72; i++)
-      printf("-");
-    printf("\n");
-    printf("Indeterminate test case: %lu.\n", case_id);
-    printf("\tError code %d returned.\n", rc);
-    return -1;
-  }
-
-  // This won't always work.
-  bool success = cases_y[case_id] == y_test_vec;
-
-  if (!success) {
-    printf("\n");
-    printf("Failed test case %d.\n", (int)case_id);
-    printf("\tSubtracting z - x\n");
-    printf("\t\tz       : ");
-    printhex_be(z, z_size * 8);
-    printf("\n");
-    printf("\t\tx       : ");
-    // Align x and z.
-    for (int i = 0; i < z_size - x_size; i++) {
-      printf("   ");
-    }
-    printhex_be(x, x_size * 8);
-    printf("\n\tResults\n");
-    printf("\t\tExpected: ");
-    for (int i = 0; i < z_size - y_size; i++) {
-      printf("   ");
-    }
-    printhex_be(y, y_size * 8);
-    printf("\n");
-    printf("\t\tComputed: ");
-    for (int i = 0; i < z_size - y_test_size; i++) {
-      printf("   ");
-    }
-    printhex_be(y_test, y_test_size * 8);
-    printf("\n");
-  }
-
-  return success;
-}
-
 void run_all_testcases_add() {
   const size_t num_cases =
       std::max({cases_x.size(), cases_y.size(), cases_z.size()});
@@ -177,8 +106,11 @@ void run_all_testcases_add() {
 
   int passed = 0;
   int failed = 0;
+  size_t duration = 0;
+  size_t total_duration = 0;
   for (size_t i = 0; i < num_cases; i++) {
-    int rc = run_testcase_add(i);
+    int rc = run_testcase_add(i, &duration);
+    total_duration += duration;
     if (rc == 1)
       passed++;
     else if (rc == 0) {
@@ -188,40 +120,7 @@ void run_all_testcases_add() {
     }
   }
 
-  for (int i = 0; i < 72; i++)
-    printf("-");
-  printf("\n");
-  printf("RESULTS\n");
-  printf("\tPassed: %d / %lu\n", passed, num_cases);
-  printf("\tFailed: %d / %lu\n", failed, num_cases);
-  printf("\tNdeter: %lu / %lu\n", num_cases - passed - failed, num_cases);
-}
-void run_all_testcases_sub() {
-  const size_t num_cases =
-      std::max({cases_x.size(), cases_y.size(), cases_z.size()});
-
-  printf("\n");
-  for (int i = 0; i < 72; i++)
-    printf("=");
-  printf("\n");
-  printf("TESTING\n");
-  printf("\tFunction: \"sub_bstrings\"\n");
-  for (int i = 0; i < 72; i++)
-    printf("-");
-  printf("\n");
-
-  int passed = 0;
-  int failed = 0;
-  for (size_t i = 0; i < num_cases; i++) {
-    int rc = run_testcase_sub(i);
-    if (rc == 1)
-      passed++;
-    else if (rc == 0) {
-      failed++;
-    } else if (rc == 2) {
-      // ND.
-    }
-  }
+  size_t avg_duration = total_duration / num_cases;
 
   for (int i = 0; i < 72; i++)
     printf("-");
@@ -230,10 +129,11 @@ void run_all_testcases_sub() {
   printf("\tPassed: %d / %lu\n", passed, num_cases);
   printf("\tFailed: %d / %lu\n", failed, num_cases);
   printf("\tNdeter: %lu / %lu\n", num_cases - passed - failed, num_cases);
+  printf("\n");
+  printf("\tAvg. ns per byte processed: %lu\n", avg_duration);
 }
 
 int main() {
   run_all_testcases_add();
-  run_all_testcases_sub();
   return 0;
 };
