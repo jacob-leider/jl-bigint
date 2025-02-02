@@ -1,6 +1,10 @@
 # jl-bigint
 A bare-bones c library for manipulating integers of arbitrary size. My test framework uses c++ (and a bit of python scripting), but everything in `src` is pure c.
 
+## Documentation
+
+Documentation can be obtained by running [doxygen](https://www.doxygen.nl/download.html). with source code root `jl-bigint/src`, or just reading the source code.
+
 ## Running Tests
 
 Run `make` to generate the testcases and compile the unit testing program. This will:
