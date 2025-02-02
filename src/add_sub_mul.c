@@ -194,9 +194,9 @@ uint8_t add_bstrings_nocheck(const uint8_t *x, const uint8_t *y, uint8_t *z,
  *
  * (2) If y < x: sub(x, y, z) = (x - y) mod 2^dz.
  *
- *    If dz >= dx - dy: sub(x, y, z) = x - y.
+ *    If dz >= d(x - y): sub(x, y, z) = x - y.
  *
- *    If dz < dx - dy: z will miss leading bits, and the carry flag will be
+ *    If dz < d(x - y): z will miss leading bits, and the carry flag will be
  *                      set.
  *
  * (3) If y == x: sub(x, y, z) = 0, and always fits in z.
@@ -234,16 +234,16 @@ uint8_t sub_bstrings_nocheck(const uint8_t *x, const uint8_t *y, uint8_t *z,
 }
 
 /**
- * @brief Add @p x and @p y, store in @p z.
+ * @brief Adds @p x and @p y, and stores the sum in @p z.
  *
- * Error codes:
- *    (0) Success.
- *    (1) @p x, @p y, or @p z is NULL.
+ *  - Error codes:
+ *      0. Success.
+ *      1. @p x, @p y, or @p z is NULL.
  *
- * Flags (bit index, significance increasing):
- *    (0) Carry bit. Set if the last carried value is 1. Implies @p x +
+ *  - Flags (bit index, significance increasing):
+ *      0. Carry bit. Set if the last carried value is 1. Implies @p x +
  *        @p y doesn't fit in @p z, but the converse doesn't necessarily hold.
- *    (1) Overflow bit. Set if @p x + @p y has a larger  binary representation
+ *      1. Overflow bit. Set if @p x + @p y has a larger  binary representation
  *        than @p x or @p y. Meaningless if the 0-bit is set.
  *
  * @param[in] x (uint8_t*): Points to an array of bytes in little-endian
@@ -261,7 +261,7 @@ uint8_t sub_bstrings_nocheck(const uint8_t *x, const uint8_t *y, uint8_t *z,
  * @param[in] y_size (size_t): Size of @p y.
  * @param[in] z_size (size_t): Size of @p z.
  *
- * @return ret (uint8_t): An error code. See description for details.
+ * @return (uint8_t): An error code. See description for details.
  */
 uint8_t add_bstrings(const uint8_t *x, const uint8_t *y, uint8_t *z,
                      uint8_t *flags, size_t x_size, size_t y_size,
@@ -297,12 +297,12 @@ uint8_t add_bstrings(const uint8_t *x, const uint8_t *y, uint8_t *z,
  * x_size + 1) + @p x - @p y, and carry is nonzero. If @p x >= @p y, the value
  * stored in @p z is @p x - @p y.
  *
- * Error codes:
- *    (0) Success.
- *    (1) @p x, @p y, or @p z is NULL.
+ *  - Error codes:
+ *      0. Success.
+ *      1. @p x, @p y, or @p z is NULL.
  *
- * Flags:
- *    // TODO: Check for a negative value.
+ *  - Flags:
+ *      0. Carry bit is set.
  *
  * @param[in] x (uint8_t*): Points to an array of bytes in little-endian
  * order.
@@ -316,7 +316,7 @@ uint8_t add_bstrings(const uint8_t *x, const uint8_t *y, uint8_t *z,
  * @param y_size[in] (size_t): Size of @p y.
  * @param z_size[in] (size_t): Size of @p z.
  *
- * @return ret (uint8_t): An error code.
+ * @return (uint8_t): An error code.
  */
 uint8_t sub_bstrings(const uint8_t *x, const uint8_t *y, uint8_t *z,
                      uint8_t *flags, size_t x_size, size_t y_size,
