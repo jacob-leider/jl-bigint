@@ -38,7 +38,7 @@ def generate_cfile() -> str:
     c3 = []
 
     # Random cases.
-    for i in range(10):
+    for i in range(300):
         r1 = random.randint(2**100, 2**101)
         r2 = random.randint(2**100, 2**101)
         
@@ -47,20 +47,32 @@ def generate_cfile() -> str:
         c1.append(t1)
         c2.append(t2)
         c3.append(t3)
+
     
     # Edge cases.
-    for i in range(40,60):
-        t1, t2, t3 = case_str(2**i, 2**(i + 1))
-
+    for i in range(64,256,8):
+        x = 2**i
+        y = 2**(i + 1)
+        t1, t2, t3 = case_str(x, y)
         c1.append(t1)
         c2.append(t2)
         c3.append(t3)
 
-        t1, t2, t3 = case_str(2**i - 1, 2**(i + 1) - 1)
-
+        t1, t2, t3 = case_str(y, x)
         c1.append(t1)
         c2.append(t2)
         c3.append(t3)
+
+        t1, t2, t3 = case_str(x - 1, y - 1)
+        c1.append(t1)
+        c2.append(t2)
+        c3.append(t3)
+
+        t1, t2, t3 = case_str(y - 1, x - 1)
+        c1.append(t1)
+        c2.append(t2)
+        c3.append(t3)
+
 
 
     headers = ["vector"]
