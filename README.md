@@ -5,7 +5,7 @@ A bare-bones c library for manipulating integers of arbitrary size. My test fram
 
 Documentation can be obtained by running [doxygen](https://www.doxygen.nl/download.html) with source code root `jl-bigint/src`, or just reading the source code.
 
-## Running Tests
+## Unit Testing
 
 Run `make` to generate the testcases and compile the unit testing program. This will:
 
