@@ -1,5 +1,7 @@
 # jl-bigint
-A bare-bones c library for manipulating integers of arbitrary size. My test framework uses c++ (and a bit of python scripting), but everything in `src` is pure c.
+A bare-bones c library for manipulating integers of arbitrary size. My test framework uses c++ (and a bit of python scripting), but everything in `src` is pure c. This exists solely for the purpose of allowing myself to mess around with the internals of a big-integer library, and tailor the behavior for my specific use cases.
+
+Do not use this library. Use [GMP](https://gmplib.org).
 
 ## Documentation
 
