@@ -77,6 +77,44 @@ static void sub_block(uint8_t x, uint8_t y, uint8_t *z, uint8_t *carry,
   *carry = 0;
 }
 
+/**
+ * @brief Perform multiplication of 8 bit unsigned ints, using only 8 bit
+ * unsigned ints.
+ *
+ * @param[in] x (uint8_t): Factor.
+ * @param[in] y (uint8_t): Factor.
+ * @param[out] z (uint8_t*): Must be two bytes. Will store the LSBS in the first
+ * byte, and MSBS in the second byte.
+ */
+static void mult_block(uint8_t x, uint8_t y, uint8_t *z) {
+  const uint8_t x0 = x & 0x0F; // last 4 bits of x
+  const uint8_t x1 = x >> 4;   // first 4 bits of x
+  const uint8_t y0 = y & 0x0F; // last 4 bits of y
+  const uint8_t y1 = y >> 4;   // first 4 bits of y
+  uint8_t z0 = x0 * y0;
+  uint8_t z1 = 0;
+  uint8_t z2 = x1 * y1;
+  uint8_t c = 0;
+
+  add_block(x0 * y1, x1 * y0, &z1, &c, 0); // Compute z1.
+
+  if (c)
+    z2 += (1 << 4);
+
+  c = 0;
+
+  // Compute temp 0 (LS 8 bits of prod).
+  add_block(z0, (z1 << 4), z, &c, 0);
+
+  if (c)
+    z2 += 1;
+
+  c = 0;
+
+  // Compute temp 1 (MS 8 bits of prod).
+  add_block(z2, (z1 >> 4), z, &c, 1);
+}
+
 // x_size <= y_size <= z_size
 static uint8_t sub_bstrings_nocheck_xyz(const uint8_t *x, const uint8_t *y,
                                         uint8_t *z, size_t x_size,
@@ -233,6 +271,23 @@ uint8_t sub_bstrings_nocheck(const uint8_t *x, const uint8_t *y, uint8_t *z,
   return carry;
 }
 
+uint8_t mul_bstrings_8_gradeschool_nocheck(const uint8_t *x, const uint8_t *y,
+                                           uint8_t *z, size_t x_size,
+                                           size_t y_size, size_t z_size) {
+  uint8_t temp[3] = {0, 0, 0}; // prod LSBs, prod MSBs, flag byte
+  for (size_t i = 0; i < x_size; i++) {
+    for (size_t j = 0; j < y_size; j++) {
+      if (x[i] | y[j]) {
+        mult_block(x[i], y[j], temp);
+        add_bstrings(z + i + j, temp, z + i + j, temp + 2, z_size - i - j, 2,
+                     z_size - i - j);
+      }
+    }
+  }
+
+  return 0;
+}
+
 /**
  * @brief Adds @p x and @p y, and stores the sum in @p z.
  *
@@ -326,6 +381,38 @@ uint8_t sub_bstrings(const uint8_t *x, const uint8_t *y, uint8_t *z,
     return 1;
 
   *flags = sub_bstrings_nocheck(x, y, z, x_size, y_size, z_size);
+
+  return 0;
+}
+
+/**
+ * @brief Multiplies x and y, and stores the product in @p z. If @p z_size is
+ * smaller than the binary representation of @p x * @p y, @p z will store the
+ * least significant @p z_size bytes of the product.
+ *
+ *  - Error codes:
+ *      0. Success.
+ *      1. @p x, @p y, or @p z is NULL.
+ *
+ * @param[in] x (uint8_t*): Points to an array of bytes in little-endian
+ * order.
+ * @param[in] y (uint8_t*): Points to an array of bytes in little-endian
+ * order.
+ * @param[out] z (uint8_t*): Address of least significant byte of @p z.
+ * @param x_size[in] (size_t): Size of @p x.
+ * @param y_size[in] (size_t): Size of @p y.
+ * @param z_size[in] (size_t): Size of @p z.
+ *
+ * @return An error code. See Error codes in the description.
+ */
+uint8_t mul_bstrings_8_gradeschool(const uint8_t *x, const uint8_t *y,
+                                   uint8_t *z, uint8_t *flags, size_t x_size,
+                                   size_t y_size, size_t z_size) {
+  // Error check 1.
+  if (x == NULL | y == NULL | z == NULL)
+    return 1;
+
+  *flags = mul_bstrings_8_gradeschool_nocheck(x, y, z, x_size, y_size, z_size);
 
   return 0;
 }
